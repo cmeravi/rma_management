@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_product_return,access_product_return,model_product_return,mdlu_rma_management.group_product_return,1,1,1,0
+access_product_return_line,access_product_return_line,model_product_return_line,mdlu_rma_management.group_product_return,1,1,1,0
+access_product_return_portal,access_product_return,model_product_return,,1,1,1,0
+access_product_return_line_portal,access_product_return_line,model_product_return_line,,1,1,1,0

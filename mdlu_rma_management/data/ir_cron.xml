@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+  <!-- RMA Followup -->
+  <record id="ir_cron_rma_followup" model="ir.cron">
+      <field name="name">RMA Management: Followup</field>
+      <field name="active" eval="True" />
+      <field name="state">code</field>
+      <field name="interval_number">24</field>
+      <field name="interval_type">hours</field>
+      <field name="numbercall">-1</field>
+      <field name="model_id" ref="model_product_return"/>
+      <field name="code">model.rma_followup()</field>
+      <field name="nextcall" >2018-07-13 4:00:00</field>
+  </record>
+</odoo>

@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ====== Specific Subscription Page ====== -->
+    <template id="rma_portal_template" name="RMA" inherit_id="portal.portal_sidebar" primary="True">
+        <xpath expr="//div[hasclass('o_portal_sidebar')]" position="inside">
+          <div class="row mt16 oe_website_contract o_portal_sidebar">
+
+                <!-- ====== Sidebar  ====== -->
+                <t t-call="portal.portal_record_sidebar">
+                    <t t-set="classes" t-value="'col-lg-auto d-print-none'"/>
+
+                    <t t-set="entries">
+                        <ul class="list-group list-group-flush flex-wrap flex-row flex-lg-column">
+                            <li t-if="rma.partner_id.user_id" class="list-group-item flex-grow-1">
+                                <div class="small mb-1"><strong class="text-muted">Your Contact:</strong></div>
+                                <div class="row flex-nowrap">
+                                    <div class="col flex-grow-0 pr-2">
+                                        <img class="rounded-circle mr4 float-left o_portal_contact_img" t-if="rma.partner_id.user_id.image" t-attf-src="data:image/png;base64,#{rma.partner_id.user_id.image}" alt="Contact"/>
+                                        <img class="rounded-circle mr4 float-left o_portal_contact_img" t-if="not rma.partner_id.user_id.image" src="/web/static/src/img/placeholder.png" alt="Contact"/>
+                                    </div>
+                                    <div class="col pl-0" style="min-width: 150px">
+                                        <span t-field="rma.partner_id.user_id" t-options='{"widget": "contact", "fields": ["name", "phone"], "no_marker": True}'/>
+                                        <a t-if="rma.partner_id.user_id.email" t-attf-href="mailto:{{rma.partner_id.user_id.email}}" class="small"><i class="fa fa-envelope"></i> Send email</a>
+                                    </div>
+                                </div>
+                            </li>
+                        </ul>
+                    </t>
+                </t>
+
+                <!-- ====== Page Content  ====== -->
+                <div class="col-12 col-lg">
+                    <div class="card oe_website_contract">
+                        <div class="card-header bg-white pb-2 pt-3">
+                            <div class="row">
+                                <div class="col-12 col-lg flex-grow-1 mb-1 mb-lg-0">
+                                    <h4 class="mb-0"><span t-field="rma.display_name"/></h4>
+                                </div>
+                                <div class="col-12 col-lg flex-grow-0 text-lg-right mb-1 mb-lg-0">
+                                    <span t-if="rma.state == 'draft'" class="badge badge-pill badge-info">New</span>
+                                    <span t-if="rma.state == 'waiting_product'" class="badge badge-pill badge-primary">Waiting for Product</span>
+                                    <span t-if="rma.state == 'waiting_refund'" class="badge badge-pill badge-primary">Waiting on Credit</span>
+                                    <span t-if="rma.state == 'followup'" class="badge badge-pill badge-warning">Requres Followup</span>
+                                    <span t-if="rma.state == 'done'" class="badge badge-pill badge-success">Done</span>
+                                    <span t-if="rma.state == 'cancelled'" class="badge badge-pill badge-danger">Cancelled</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div t-if="message" t-att-class="'alert ' + message_class" role="alert">
+                                <p t-esc="message"/>
+                            </div>
+
+                            <div class="row mt-4">
+                                <!-- ======  Plan Overview ====== -->
+                                <div class="col-12 col-lg-5  mb-3 mb-lg-0">
+                                    <h5 class="mb-1">RMA Information</h5>
+                                    <hr class="my-0"/>
+                                    <table class="table table-borderless table-sm">
+                                        <tbody style="white-space:nowrap">
+                                          <tr>
+                                              <th class="pb-0">Request Date: </th>
+                                              <td class="w-100 pb-0"><span t-field="rma.order_date"/></td>
+                                          </tr>
+                                            <tr t-if="rma.sale_order_id or rma.purchase_id">
+                                              <th>Order #: </th>
+                                              <td t-if="rma.sale_order_id">
+                                                <a t-att-href="rma.sale_order_id.get_portal_url()" t-att-title="rma.sale_order_id.display_name">
+                                                  <t t-esc="rma.sale_order_id.display_name"/>
+                                                </a>
+                                              </td>
+                                              <td t-if="rma.purchase_id">
+                                                <a t-att-href="rma.purchase_id.get_portal_url()" t-att-title="rma.purchase_id.display_name">
+                                                  <t t-esc="rma.purchase_id.display_name"/>
+                                                </a>
+                                              </td>
+                                            </tr>
+                                            <tr t-if="rma.purchase_id">
+                                                <th class="pb-0">RMA #:</th>
+                                                <td class="w-100 pb-0"><span t-field="rma.reference"/></td>
+                                            </tr>
+                                            <tr>
+                                                <th class="text-right">Return Reason:</th>
+                                                <td class="w-100"><span t-field="rma.reason_return"/></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- ======  Costumer Informations  ====== -->
+                                <div class="col-12 col-lg-5 offset-lg-1">
+                                    <h5 class="mb-1">Your Information</h5>
+                                    <hr class="my-0"/>
+                                    <div t-field="rma.partner_id" t-options='{ "widget": "contact", "fields": [ "name", "address", "phone", "email"]}'/>
+                                    <a t-if="rma.partner_id" class="small" t-attf-href="/my/account?redirect=/my/crma/#{rma.id}">(Wrong address?)</a>
+                                </div>
+                            </div>
+
+                            <!-- ====== Products ====== -->
+                            <div class="row">
+                                <div class="col-12 mt-4">
+                                    <h5 class="mb-1">Products</h5>
+                                    <table class="table table-sm table-responsive-lg" id="rma-lines-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Product</th>
+                                                <th>Quantity</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr t-foreach="rma.return_line_ids" t-as="line">
+                                                <td class="line-description"><span t-field="line.product_id.name"/></td>
+                                                <td><t t-esc="line.quantity"/> <span t-field="line.uom_id" data-oe-readonly="1"/></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <br/>
+
+                    <!-- Open Invoices -->
+                    <div t-if="not rma.invoice_ids">
+                        <p></p>
+                    </div>
+                    <div t-if="rma.invoice_ids" t-call="portal.portal_table">
+                      <div class="card">
+                        <h3>Credit Notes</h3>
+                          <thead>
+                            <tr class="active">
+                                <th>Invoice #</th>
+                                <th>Invoice Date</th>
+                                <th class='d-none d-md-table-cell'>Due Date</th>
+                                <th/>
+                                <th class="text-right">Amount Due</th>
+                            </tr>
+                          </thead>
+                          <t t-foreach="rma.invoice_ids" t-as="invoice">
+                            <tr>
+                                <td>
+                                    <a t-att-href="invoice.get_portal_url()" t-att-title="invoice.number">
+                                        <t t-esc="invoice.number" t-if="invoice.number"/>
+                                        <em t-else="">Draft Invoice</em>
+                                    </a>
+                                </td>
+                                <td><span t-field="invoice.date_invoice"/></td>
+                                <td class='d-none d-md-table-cell'><span t-field="invoice.date_due"/></td>
+                                <td class="tx_status">
+                                    <t t-if="invoice.state == 'open'">
+                                        <span class="badge badge-pill badge-info"><i class="fa fa-fw fa-clock-o" aria-label="Opened" title="Opened" role="img"></i><span class="d-none d-md-inline"> Waiting for Payment</span></span>
+                                    </t>
+                                    <t t-if="invoice.state == 'paid'">
+                                        <span class="badge badge-pill badge-success"><i class="fa fa-fw fa-check" aria-label="Paid" title="Paid" role="img"></i><span class="d-none d-md-inline"> Paid</span></span>
+                                    </t>
+                                    <t t-if="invoice.state == 'cancel'">
+                                        <span class="badge badge-pill badge-warning"><i class="fa fa-fw fa-remove" aria-label="Cancelled" title="Cancelled" role="img"></i><span class="d-none d-md-inline"> Cancelled</span></span>
+                                    </t>
+                                </td>
+                                <td class="text-right"><span t-esc="-invoice.residual if invoice.type == 'out_refund' else invoice.residual" t-options='{"widget": "monetary", "display_currency": invoice.currency_id}'/></td>
+                            </tr>
+                          </t>
+                      </div>
+                    </div>
+
+                    <!-- chatter -->
+                    <div id="sale_order_communication" class="mt-4">
+                        <h2>Communication</h2>
+                        <t t-call="portal.message_thread">
+                            <t t-set="object" t-value="rma"/>
+                        </t>
+                    </div>
+                </div>
+            </div>
+        </xpath>
+    </template>
+
+    <!-- Modify portal templates -->
+    <template id="portal_my_home_menu_rma" name="Portal layout : rma menu entry" inherit_id="portal.portal_breadcrumbs" priority="10">
+        <xpath expr="//ol[hasclass('o_portal_submenu')]" position="inside">
+            <li t-if="page_name == 'crma' or rma and rma.product_return_type == 'incoming'" t-attf-class="breadcrumb-item #{'active ' if not rma else ''}">
+                <a t-if="rma" t-attf-href="/my/crmas?{{ keep_query() }}">Sale RMAs</a>
+                <t t-else="">Sale RMAs</t>
+            </li>
+            <li t-if="page_name == 'vrma' or rma and rma.product_return_type == 'outgoing'" t-attf-class="breadcrumb-item #{'active ' if not rma else ''}">
+                <a t-if="rma" t-attf-href="/my/vrmas?{{ keep_query() }}">Purchase RMAs</a>
+                <t t-else="">Purchase RMAs</t>
+            </li>
+            <li t-if="rma" class="breadcrumb-item active">
+                <t t-esc="rma.name"/>
+            </li>
+        </xpath>
+    </template>
+
+    <template id="portal_my_home_rma" name="Portal My Home : rma entries" inherit_id="portal.portal_my_home" priority="90">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-if="crma_count" t-call="portal.portal_docs_entry">
+                <t t-set="title">Sale RMAs</t>
+                <t t-set="url" t-value="'/my/crmas'"/>
+                <t t-set="count" t-value="crma_count"/>
+            </t>
+            <t t-if="vrma_count" t-call="portal.portal_docs_entry">
+                <t t-set="title">Purchase RMAs</t>
+                <t t-set="url" t-value="'/my/vrmas'"/>
+                <t t-set="count" t-value="vrma_count"/>
+            </t>
+        </xpath>
+    </template>
+
+    <template id="portal_my_crmas" name="My Subscriptions">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Sale RMAs</t>
+            </t>
+            <t t-if="not accounts">
+                <p>You don't have any Sale RMAs yet.</p>
+            </t>
+            <t t-if="accounts" t-call="portal.portal_table">
+                <thead>
+                    <tr class="active">
+                        <th class="w-75">RMA #</th>
+                        <th class="text-center">Status</th>
+                    </tr>
+                </thead>
+                <t t-foreach="accounts" t-as="rma">
+                    <tr>
+                        <td>
+                            <a t-att-href="'/my/rmas/'+str(rma.id)+'?'+keep_query()"><t t-esc="rma.display_name"/></a>
+                        </td>
+                        <td class="text-center" id="rma_state">
+                            <span t-if="rma.state == 'draft'" class="badge badge-pill badge-info">New</span>
+                            <span t-if="rma.state == 'waiting_product'" class="badge badge-pill badge-primary">Waiting for Product</span>
+                            <span t-if="rma.state == 'followup'" class="badge badge-pill badge-warning">Requres Followup</span>
+                            <span t-if="rma.state == 'done'" class="badge badge-pill badge-success"> Done</span>
+                            <span t-if="rma.state == 'cancelled'" class="badge badge-pill badge-danger"> Cancelled</span>
+                        </td>
+                    </tr>
+                </t>
+            </t>
+        </t>
+    </template>
+    <template id="portal_my_vrmas" name="My Subscriptions">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Purchase RMAs</t>
+            </t>
+            <t t-if="not accounts">
+                <p>You don't have any Purchase RMAs yet.</p>
+            </t>
+            <t t-if="accounts" t-call="portal.portal_table">
+                <thead>
+                    <tr class="active">
+                        <th class="w-75">RMA #</th>
+                        <th class="text-center">Status</th>
+                    </tr>
+                </thead>
+                <t t-foreach="accounts" t-as="rma">
+                    <tr>
+                        <td>
+                            <a t-att-href="'/my/rmas/'+str(rma.id)+'?'+keep_query()"><t t-esc="rma.display_name"/></a>
+                        </td>
+                        <td class="text-center" id="rma_state">
+                            <span t-if="rma.state == 'draft'" class="badge badge-pill badge-info">New</span>
+                            <span t-if="rma.state == 'waiting_product'" class="badge badge-pill badge-primary">Waiting for Product</span>
+                            <span t-if="rma.state == 'waiting_refund'" class="badge badge-pill badge-primary"><i class="fa fa-fw fa-remove"/> Waiting on Credit</span>
+                            <span t-if="rma.state == 'done'" class="badge badge-pill badge-success">Done</span>
+                            <span t-if="rma.state == 'cancelled'" class="badge badge-pill badge-danger">Cancelled</span>
+                        </td>
+                    </tr>
+                </t>
+            </t>
+        </t>
+    </template>
+
+</odoo>

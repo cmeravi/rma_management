@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!-- Add in configuration items -->
+  <record id="res_config_product_return_settings_view_form" model="ir.ui.view">
+    <field name="name">res.config.product.return.settings.view.form</field>
+    <field name="model">res.config.settings</field>
+    <field name="inherit_id" ref="base.res_config_settings_view_form" />
+    <field name="arch" type="xml">
+      <xpath expr="//div[hasclass('settings')]" position="inside">
+        <div class="app_settings_block" data-string="RMA Management" string="RMA Management" data-key="mdlu_rma_management" groups="mdlu_rma_management.group_product_return">
+          <h2>RMA Followup</h2>
+          <div class="row mt16 o_settings_container">
+            <div class="col-12 col-lg-12 o_setting_box" title="# of Days before the system notifies folowers that the RMA hasn't been completed.">
+              <div class="o_setting_right_pane">
+                <span class="o_form_label">Followup Timeframe</span>
+                <div>
+                  <field name="rma_followup_timeframe" class="oe_inline"/> Days
+                </div>
+              </div>
+            </div>
+
+            <div class="col-12 col-lg-12 o_setting_box" >
+              <div class="o_setting_right_pane">
+                <span class="o_form_label">Customer RMA Followup Contact</span>
+                <span class="fa fa-lg fa-building-o" title="Values set here are company-specific." aria-label="Values set here are company-specific." groups="base.group_multi_company" role="img"/>
+                <div>
+                  Email followup request to: <field name="rma_followup_contact" class="oe_inline"/>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-12 col-lg-12 o_setting_box" >
+              <div class="o_setting_right_pane">
+                <span class="o_form_label">RMA Company Abbreviation</span>
+                <span class="fa fa-lg fa-building-o" title="Values set here are company-specific." aria-label="Values set here are company-specific." groups="base.group_multi_company" role="img"/>
+                <div>
+                  Abbreviation: <field name="rma_seq_abbr" class="oe_inline"/>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </xpath>
+    </field>
+  </record>
+
+  <record id="action_rma_configuration" model="ir.actions.act_window">
+      <field name="name">Settings</field>
+      <field name="type">ir.actions.act_window</field>
+      <field name="res_model">res.config.settings</field>
+      <field name="view_mode">form</field>
+      <field name="target">inline</field>
+      <field name="context">{'module' : 'mdlu_rma_management'}</field>
+  </record>
+
+  <menuitem id="menu_rma_global_settings"
+      name="Settings"
+      parent="menu_product_return_root"
+      action="action_rma_configuration"
+      groups="group_product_return"/>
+</odoo>

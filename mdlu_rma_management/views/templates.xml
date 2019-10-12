@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <template id="crma_followup_message">
+    <p>This <t t-esc="self._description.lower()"/> requires a followup:
+      <t t-foreach="origin" t-as="o">
+        <a href="#" t-att-data-oe-model="o._name" t-att-data-oe-id="o.id"> <t t-esc="o.display_name"/></a><span t-if="origin.ids[-1:] != o.ids">, </span>
+      </t>
+    </p>
+  </template>
+</odoo>

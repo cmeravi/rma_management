@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<odoo>
+  <record id="view_sale_order_rma_wizard" model="ir.ui.view">
+    <field name="name">view.sale.order.rma.wizard</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale.view_order_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//header/button[@name='preview_sale_order']" position="before">
+        <button name="%(action_rma_wizard)d" string="Create RMA" type="action" class="oe_highlight" attrs="{'invisible': [('state', 'not in', ['sale','done'])]}"/>
+      </xpath>
+      <xpath expr="//div[@name='button_box']" position="inside">
+        <field name="rma_ids" invisible="1"/>
+        <button type="object"
+            name="action_view_rmas"
+            class="oe_stat_button"
+            icon="fa-sign-out"
+            attrs="{'invisible': [('rma_count', '=', 0)]}" groups="base.group_user">
+            <field name="rma_count" widget="statinfo" string="RMAs"/>
+        </button>
+      </xpath>
+    </field>
+  </record>
+</odoo>

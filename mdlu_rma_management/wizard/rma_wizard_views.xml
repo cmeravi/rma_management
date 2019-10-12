@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<odoo>
+  <record id="view_rma_wizard" model="ir.ui.view">
+    <field name="model">rma.wizard</field>
+    <field name="arch" type="xml">
+      <form>
+        <field name="order_model" invisible="1"/>
+        <field name="order_id" invisible="1"/>
+        <group name="source">
+          <field name="source_location_id" string="Source Location" context="{'order_model':order_model}" required="1"/>
+        </group>
+        <group name="destination">
+          <field name="destination_location_id" string="Destination Location" context="{'order_model':order_model}" required="1"/>
+        </group>
+        <label for="rma_line_ids"/>
+        <seperator>
+          <field name="rma_line_ids" domain="[('order_id','=',order_id)]">
+            <tree editable="bottom">
+              <field name="product_id"/>
+              <field name="quantity"/>
+            </tree>
+          </field>
+        </seperator>
+        <label for="reason_return" string="Return Reason"/>
+        <field name="reason_return" attrs="{'required': [('order_model','=','sale.order')]}"/>
+        <footer>
+          <button string="Create" class="btn-primary" type="object" name="get_data"/>
+          <button string="Cancel" class="btn-default" special="cancel"/>
+        </footer>
+      </form>
+    </field>
+  </record>
+
+  <record id="action_rma_wizard" model="ir.actions.act_window">
+    <field name="name">RMA Wizard</field>
+    <field name="type">ir.actions.act_window</field>
+    <field name="res_model">rma.wizard</field>
+    <field name="view_mode">form</field>
+    <field name="view_id" ref="view_rma_wizard"/>
+    <field name="target">new</field>
+  </record>
+</odoo>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <report
+        string="RMA"
+        id="action_report_product_return"
+        model="product.return"
+        report_type="qweb-pdf"
+        name="mdlu_rma_management.report_productreturn"
+        file="mdlu_rma_management.report_productreturn"
+    />
+</odoo>

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+<template id="report_productreturn_document">
+    <t t-call="web.external_layout">
+        <t t-set="o" t-value="o.with_context({'lang':o.partner_id.lang})"/>
+        <div class="page">
+            <div class="oe_structure"/>
+            <div class="row">
+              <h2>RMA #: <span t-if="o.product_return_type == 'outgoing'" t-field="o.reference"/> <span t-if="o.product_return_type == 'incoming'" t-field="o.name"/></h2>
+            </div>
+            <div class="row">
+                <div class="col-xs-6">
+                    <strong>Shipping address: </strong>
+                    <div t-if="o.partner_id">
+                        <div t-field="o.partner_id"
+                            t-options='{"widget": "contact", "fields": ["address", "name", "phone", "fax"], "no_marker": true, "phone_icons": true}'/>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt32 mb32" t-if="o.product_return_type == 'outgoing'">
+              <div t-if="o.name" class="col-xs-3">
+                  <strong>Internal RMA Number:</strong> <span t-field="o.name"/>
+              </div>
+            </div>
+            <div>
+              <div t-if="o.order_date" class="col-xs-3">
+                  <strong>Order Date:</strong> <span t-field="o.order_date"/>
+              </div>
+            </div>
+            <div>
+              <div t-if="o.reason_return" class="col-xs-3" >
+              		<strong>Reason for Return: </strong> <span t-field="o.reason_return"/>
+              </div>
+            </div>
+
+            <div>
+            	<th><br/></th>
+            </div>
+
+            <table class="table table-condensed">
+                <thead>
+                    <tr>
+                        <th><strong>Product</strong></th>
+                        <th class="text-right"><strong>Qty</strong></th>
+                        <th class="text-right" t-if="o.product_return_type == 'outgoing'"><strong>Std Cost</strong></th>
+                        <th class="text-right"><strong>Unit Price</strong></th>
+                        <th class="text-right"><strong>Net Price</strong></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="o.return_line_ids" t-as="line">
+                        <td>
+                            <span t-field="line.product_id.name"/>
+                        </td>
+                        <td class="text-right">
+                            <span t-field="line.quantity"/>
+                            <span t-field="line.uom_id.name" t-if="o.product_return_type == 'outgoing'"/>
+                        </td>
+                        <td class="text-right" t-if="o.product_return_type == 'outgoing'">
+                            <span t-field="line.price_unit"/>
+                        </td>
+                        <td class="text-right">
+                            <span t-field="line.last_price_unit"/>
+                        </td>
+                        <td class="text-right">
+                            <span t-field="line.price_total"/>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="row">
+                <div class="col-xs-4 pull-right">
+                    <table class="table table-condensed">
+                        <tr class="border-black">
+                            <td><strong>Total</strong></td>
+                            <td class="text-right">
+                                <span t-field="o.amount_total"/>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="oe_structure"/>
+        </div>
+    </t>
+</template>
+
+<template id="report_productreturn">
+    <t t-call="web.html_container">
+        <t t-foreach="docs" t-as="o">
+            <t t-call="mdlu_rma_management.report_productreturn_document" t-lang="o.partner_id.lang"/>
+        </t>
+    </t>
+</template>
+</openerp>
