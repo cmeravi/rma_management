@@ -9,7 +9,7 @@
     'summary': 'Return Merchandise Authorization (RMA) Management tracks and allows for both customer returns as well as vendor returns.',
     'category': 'Purchases',
     'images': ['static/description/banner.png',],
-    'price': 40.00,
+    'price': 75.00,
     'currency': 'USD',
     'depends': [
         'base',
