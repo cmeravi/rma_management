@@ -2,7 +2,7 @@
 
 {
     'name': 'RMA Management',
-    'version': '12.0.1.0.1',
+    'version': '13.0.1.0',
     'license': 'AGPL-3',
     'author':   'Moddulu Solutions',
     'website': 'https://moddulu.com',
@@ -10,7 +10,7 @@
     'category': 'Purchases',
     'images': ['static/description/banner.png',],
     'price': 75.00,
-    'currency': 'USD',
+    'currency': 'EUR',
     'depends': [
         'base',
         'purchase',

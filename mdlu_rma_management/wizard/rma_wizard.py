@@ -58,7 +58,7 @@ class RMAWizard(models.TransientModel):
     source_location_id = fields.Many2one('stock.location', string='Source Location', required=True)
     destination_location_id = fields.Many2one('stock.location', string='Destination Location', required=True)
 
-    @api.multi
+    
     def get_data(self):
         self.ensure_one()
         context = dict(self._context or {})

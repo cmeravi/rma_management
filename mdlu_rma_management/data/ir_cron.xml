@@ -10,6 +10,5 @@
       <field name="numbercall">-1</field>
       <field name="model_id" ref="model_product_return"/>
       <field name="code">model.rma_followup()</field>
-      <field name="nextcall" >2018-07-13 4:00:00</field>
   </record>
 </odoo>

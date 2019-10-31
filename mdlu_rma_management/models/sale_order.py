@@ -8,7 +8,7 @@ from odoo import api, fields, models, _
 class SaleOrder(models.Model):
     _inherit = "sale.order"
 
-    @api.multi
+    
     def _compute_rma_ids(self):
         for so in self:
             so.rma_count = len(so.rma_ids)
@@ -16,7 +16,7 @@ class SaleOrder(models.Model):
     rma_ids = fields.One2many('product.return','sale_order_id', string='RMA')
     rma_count = fields.Integer(string='RMAs', compute='_compute_rma_ids')
 
-    @api.multi
+    
     def action_view_rmas(self):
         action = self.env.ref('mdlu_rma_management.action_product_return').read()[0]
         rma_ids = self.mapped('rma_ids')

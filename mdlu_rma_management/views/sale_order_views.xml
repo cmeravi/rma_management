@@ -5,7 +5,7 @@
     <field name="model">sale.order</field>
     <field name="inherit_id" ref="sale.view_order_form"/>
     <field name="arch" type="xml">
-      <xpath expr="//header/button[@name='preview_sale_order']" position="before">
+      <xpath expr="//header/button[@name='payment_action_void']" position="after">
         <button name="%(action_rma_wizard)d" string="Create RMA" type="action" class="oe_highlight" attrs="{'invisible': [('state', 'not in', ['sale','done'])]}"/>
       </xpath>
       <xpath expr="//div[@name='button_box']" position="inside">

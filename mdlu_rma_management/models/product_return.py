@@ -50,7 +50,7 @@ class ProductReturn(models.Model):
             return_order.amount_total = sum(return_order.return_line_ids.mapped('price_total'))
 
     #get a count of how many pickings are associated with the RMA
-    @api.multi
+
     def _compute_picking_ids(self):
         for rma in self:
             rma.delivery_count = len(rma.picking_ids.filtered(lambda pick: pick.state != 'cancel'))
@@ -60,8 +60,6 @@ class ProductReturn(models.Model):
             if rec.product_return_type in ['incoming', 'outgoing']:
                 rec.edit_return_type = False
 
-
-
     @api.model
     def _get_return_type(self):
         return_type = self.product_return_type
@@ -70,13 +68,6 @@ class ProductReturn(models.Model):
         return return_type
 
     #Set Domains based on RMA Type
-    @api.onchange('partner_id','product_return_type')
-    def set_partner_domain(self):
-        return_type = self._get_return_type()
-        domain = PARTNER_DOMAINS[return_type] if return_type else []
-        partner_ids = self.env['res.partner'].search(domain).mapped('id')
-        return {'domain':{'partner_id': [('id','in',partner_ids)],},}
-
     @api.onchange('source_location_id','product_return_type')
     def set_source_domain(self):
         return_type = self._get_return_type()
@@ -123,12 +114,11 @@ class ProductReturn(models.Model):
     currency_id = fields.Many2one("res.currency", related='company_id.currency_id', string="Currency", readonly=True, required=True)
 
     invoice_count = fields.Integer(string='# of Invoices', compute='_get_invoiced', readonly=True)
-    invoice_ids = fields.One2many("account.invoice", 'rma_id', string='Invoices', readonly=True, copy=False)
+    invoice_ids = fields.One2many("account.move", 'rma_id', string='Invoices', readonly=True, copy=False)
     picking_ids = fields.One2many('stock.picking', 'rma_id', string='Picking associated to this RMA')
     delivery_count = fields.Integer(string='Delivery Orders', compute='_compute_picking_ids')
 
 
-    @api.multi
     @api.returns('self', lambda value: value.id)
     def copy(self, default=None):
         rec = super(ProductReturn, self).copy()
@@ -139,7 +129,7 @@ class ProductReturn(models.Model):
         return rec
 
     #set soft values bassed off of product return type
-    @api.multi
+
     def write(self, vals):
         if self.product_return_type == 'incoming' and self.company_id.rma_followup_contact and self.company_id.rma_followup_contact.partner_id not in self.message_partner_ids:
             self.message_subscribe(partner_ids=[self.company_id.rma_followup_contact.partner_id.id])
@@ -154,33 +144,35 @@ class ProductReturn(models.Model):
         rma.message_subscribe(partner_ids=partners)
         return rma
 
-    @api.multi
+
     def action_cancel(self):
         self.write({'state': 'cancelled',})
         for picking in self.picking_ids:
             picking.action_cancel()
+        for invoice in self.invoice_ids:
+            invoice.button_cancel()
 
-    @api.multi
     def action_reset(self):
         self.write({'state': 'draft'})
         for pick in self.picking_ids:
             pick.action_cancel()
-        self.invoice_ids.action_invoice_cancel()
+        for invoice in self.invoice_ids:
+            invoice.button_cancel()
 
-    @api.multi
+
     def action_received(self):
         self.write({'state': 'done'})
 
     @api.model
     def verify_credits(self):
         for rma in self:
-            invoice_states = rma.invoice_ids.mapped('state')
+            invoice_states = rma.invoice_ids.mapped('invoice_payment_state')
             if all(x in ['paid','cancel'] for x in invoice_states):
                 rma.action_received()
 
 
     #define button for stock moves
-    @api.multi
+
     def action_view_delivery(self):
         action = self.env.ref('stock.action_picking_tree_all').read()[0]
         pickings = self.mapped('picking_ids')
@@ -211,24 +203,25 @@ class ProductReturn(models.Model):
             rma.update({'invoice_count': len(rma.invoice_ids.filtered(lambda inv: inv.state != 'cancel')),})
 
     #define button for viewing the invoices
-    @api.multi
     def action_view_invoice(self):
         invoices = self.mapped('invoice_ids')
-        action = self.env.ref('account.action_invoice_tree1').read()[0]
+        return self.view_invoices(invoices)
+
+    def view_invoices(self,invoices):
+        action = self.env.ref('account.action_move_out_refund_type').read()[0]
+        if self.product_return_type == 'outgoing':
+            action = self.env.ref('account.action_move_in_refund_type').read()[0]
         if len(invoices) > 1:
             action['domain'] = [('id', 'in', invoices.ids)]
         elif len(invoices) == 1:
-            if self.product_return_type == 'outgoing':
-                action['views'] = [(self.env.ref('account.invoice_supplier_form').id, 'form')]
-            elif self.product_return_type == 'incoming':
-                action['views'] = [(self.env.ref('account.invoice_form').id, 'form')]
+            action['views'] = [(self.env.ref('account.view_move_form').id, 'form')]
             action['res_id'] = invoices.ids[0]
         else:
             action = {'type': 'ir.actions.act_window_close'}
         return action
 
     #get the picking types
-    @api.multi
+
     def _get_picking_type_id(self):
         warehouse_id = self.env['stock.warehouse'].search([('company_id', '=', self.company_id.id)])
         picking_type_id = self.env['stock.picking.type'].search([('code', '=', self.product_return_type), ('warehouse_id', 'in', warehouse_id.ids)], limit=1)
@@ -247,7 +240,7 @@ class ProductReturn(models.Model):
             'rma_id': self.id,
         }
 
-    @api.multi
+
     def _product_qty_by_location(self, product, warehouse_stock_location):
 
         #update context with source location
@@ -264,9 +257,8 @@ class ProductReturn(models.Model):
 
         return qty_wh
 
-    @api.multi
-    def _create_picking(self):
 
+    def _create_picking(self):
         #check quantity based on source location
         if self.product_return_type == 'outgoing':
             for line in self.return_line_ids:
@@ -298,16 +290,14 @@ class ProductReturn(models.Model):
             #create stock moves
             moves = self.return_line_ids.filtered(lambda r: r.product_id.type in ['product', 'consu']).sudo()._create_stock_moves(picking, self)
 
-        return picking
+            return picking
+        return False
 
-    @api.multi
+
     def _get_journal(self):
-        journal_pool = self.env['account.journal']
-        company_id = self.env.user.company_id.id
-
         #set journal domain
         journal_domain = [
-            ('company_id','=',company_id)
+            ('company_id','=',self.env.user.company_id.id)
         ]
         if self.product_return_type == 'incoming':
             journal_domain += (('type', '=', 'sale'),)
@@ -316,44 +306,43 @@ class ProductReturn(models.Model):
 
 
         #search purchase refund journal
-        journal = journal_pool.search(journal_domain, limit=1)
+        journal = self.env['account.journal'].search(journal_domain, limit=1)
 
         return journal and journal.id or False
 
-    @api.multi
+
     def _prepare_invoice_dict(self, partner):
         #get journal
         journal_id = self._get_journal()
 
         #prepare dict
         inv_dict = {
+            'invoice_payment_state': 'not_paid',
             'partner_id':partner.id,
-            'date_invoice': datetime.today().date(),
+            'invoice_date': datetime.today().date(),
             'journal_id': journal_id,
             'user_id': self.env.user.id,
             'rma_id': self.id,
+            'invoice_line_ids': [],
         }
 
         if self.product_return_type == 'incoming':
             inv_dict.update({
-                'account_id': partner.property_account_receivable_id and partner.property_account_receivable_id.id or False,
                 'is_return_customer': True,
                 'type': 'out_refund',
             })
         elif self.product_return_type == 'outgoing':
             inv_dict.update({
-                'account_id': partner.property_account_payable_id and partner.property_account_payable_id.id or False,
                 'is_return_supplier': True,
                 'type': 'in_refund',
-                'reference': self.reference,
+                'ref': self.reference,
             })
 
         return inv_dict
 
-    @api.multi
+
     def _create_credit_note(self):
         result = []
-        AccountInvoiceLine = self.env['account.invoice.line']
         for rma in self:
 
             #browse partner record
@@ -361,11 +350,8 @@ class ProductReturn(models.Model):
 
             #prepare invoice dict
             inv_dict = rma._prepare_invoice_dict(partner)
-            inv_dict.update({'origin': rma.name})
+            inv_dict.update({'invoice_origin': rma.name})
 
-            #create credit_note
-            credit_note = self.env['account.invoice'].create(inv_dict)
-            inv_line_list = self.env['account.invoice.line']
             for line in rma.return_line_ids:
 
                 #set credit note line description
@@ -376,29 +362,25 @@ class ProductReturn(models.Model):
                 description += line.product_id.name
 
                 #set account
-                if rma.product_return_type == 'outgoing':
-                    account = line.product_id.property_stock_account_input or line.product_id.categ_id.property_stock_account_input_categ_id
-                elif rma.product_return_type == 'incoming':
-                    account = AccountInvoiceLine.get_invoice_line_account(credit_note.type, line.product_id, credit_note.fiscal_position_id, credit_note.company_id)
+                account_type = 'income' if rma.product_return_type == 'outgoing' else 'expense'
+                account = line.product_id.product_tmpl_id._get_product_accounts()[account_type]
 
                 if not account:
                     raise ValidationError(_("Please update Product stock input account or Product's category stock input account."))
-
                 #set invoice line dict
                 inv_line_vals = {
-                    'product_id': line.product_id and line.product_id.id or False,
-                    'quantity': line.quantity,
                     'name': description,
+                    'analytic_account_id': line.account_analytic_id.id,
+                    'product_id': line.product_id.id,
+                    'quantity': line.quantity,
+                    'product_uom_id': line.uom_id.id,
                     'account_id': account.id,
-                    'uom_id': line.uom_id and line.uom_id.id or False,
-                    'invoice_id': credit_note.id,
-                    'account_analytic_id': line.account_analytic_id and line.account_analytic_id.id or False,
                     'price_unit': line.price_unit if rma.product_return_type == 'incoming' else line.last_price_unit,
                 }
 
-                new_inv_line = self.env['account.invoice.line'].create(inv_line_vals)
-                new_inv_line.return_line_ids |= line
-                inv_line_list |= new_inv_line
+                inv_dict['invoice_line_ids'].append((0,0,inv_line_vals))
+
+            credit_note = self.env['account.move'].create(inv_dict)
 
             # Put the reason in the chatter
             subject = _("Product Return to Credit Note refund")
@@ -406,13 +388,13 @@ class ProductReturn(models.Model):
             credit_note.message_post(body=body, subject=subject)
 
             #call workflow signal and validate Credit Note
-            credit_note.action_invoice_open()
+            credit_note.action_post()
             credit_note.write({'state': 'draft'})
 
         return True
 
 
-    @api.multi
+
     def create_delivery_order(self):
 
         for rma in self:
@@ -444,6 +426,9 @@ class ProductReturn(models.Model):
                 rma.write({'state': 'waiting_product'})
             if rma.product_return_type == 'outgoing':
                 rma.write({'state': 'waiting_refund'})
+
+            if all(x not in ['product', 'consu'] for x in rma.return_line_ids.mapped('product_id').mapped('type')):
+                rma.action_received()
 
         return True
 
@@ -497,7 +482,7 @@ class ProductReturnLine(models.Model):
     price_total = fields.Monetary(compute='_compute_amount',string='Sub Total', readonly=True, store=True)
     currency_id = fields.Many2one(related='return_id.currency_id', store=True, string='Currency', readonly=True)
     invoice_lines = fields.Many2many(
-        'account.invoice.line',
+        'account.move.line',
         'product_return_line_invoice_rel',
         'return_line_id',
         'invoice_line_id',
@@ -552,7 +537,7 @@ class ProductReturnLine(models.Model):
 
                 self.last_price_unit = self.product_id.standard_price
 
-    @api.multi
+
     def _create_stock_moves(self, picking, rma):
 
         #set variables
