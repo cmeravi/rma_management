@@ -125,7 +125,7 @@ class CustomerPortal(CustomerPortal):
         searchbar_filters = {
             'all': {'label': _('All'), 'domain': []},
             'draft': {'label': _('New'), 'domain': [('state', '=', 'draft')]},
-            'waiting_product': {'label': _('Waiting for Product'), 'domain': [('state', '=', 'waiting_product')]},
+            'processing': {'label': _('RMA Processing'), 'domain': [('state', '=', 'processing')]},
             'done': {'label': _('Done'), 'domain': [('state', '=', 'done')]},
             'cancelled': {'label': _('Cancelled'), 'domain': [('state', '=', 'cancelled')]},
         }

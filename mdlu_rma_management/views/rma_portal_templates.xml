@@ -39,8 +39,7 @@
                                 </div>
                                 <div class="col-12 col-lg flex-grow-0 text-lg-right mb-1 mb-lg-0">
                                     <span t-if="rma.state == 'draft'" class="badge badge-pill badge-info">New</span>
-                                    <span t-if="rma.state == 'waiting_product'" class="badge badge-pill badge-primary">Waiting for Product</span>
-                                    <span t-if="rma.state == 'waiting_refund'" class="badge badge-pill badge-primary">Waiting on Credit</span>
+                                    <span t-if="rma.state == 'processing'" class="badge badge-pill badge-primary">RMA Processing</span>
                                     <span t-if="rma.state == 'followup'" class="badge badge-pill badge-warning">Requres Followup</span>
                                     <span t-if="rma.state == 'done'" class="badge badge-pill badge-success">Done</span>
                                     <span t-if="rma.state == 'cancelled'" class="badge badge-pill badge-danger">Cancelled</span>
@@ -232,7 +231,7 @@
                         </td>
                         <td class="text-center" id="rma_state">
                             <span t-if="rma.state == 'draft'" class="badge badge-pill badge-info">New</span>
-                            <span t-if="rma.state == 'waiting_product'" class="badge badge-pill badge-primary">Waiting for Product</span>
+                            <span t-if="rma.state == 'processing'" class="badge badge-pill badge-primary">RMA Processing</span>
                             <span t-if="rma.state == 'followup'" class="badge badge-pill badge-warning">Requres Followup</span>
                             <span t-if="rma.state == 'done'" class="badge badge-pill badge-success"> Done</span>
                             <span t-if="rma.state == 'cancelled'" class="badge badge-pill badge-danger"> Cancelled</span>
@@ -266,8 +265,7 @@
                         </td>
                         <td class="text-center" id="rma_state">
                             <span t-if="rma.state == 'draft'" class="badge badge-pill badge-info">New</span>
-                            <span t-if="rma.state == 'waiting_product'" class="badge badge-pill badge-primary">Waiting for Product</span>
-                            <span t-if="rma.state == 'waiting_refund'" class="badge badge-pill badge-primary"><i class="fa fa-fw fa-remove"/> Waiting on Credit</span>
+                            <span t-if="rma.state == 'processing'" class="badge badge-pill badge-primary">Processing</span>
                             <span t-if="rma.state == 'done'" class="badge badge-pill badge-success">Done</span>
                             <span t-if="rma.state == 'cancelled'" class="badge badge-pill badge-danger">Cancelled</span>
                         </td>

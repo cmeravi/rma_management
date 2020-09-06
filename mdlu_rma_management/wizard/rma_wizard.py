@@ -55,8 +55,10 @@ class RMAWizard(models.TransientModel):
 
     rma_line_ids = fields.One2many('rma.wizard.line', 'rma_wizard_id', string='Wizard Lines')
     reason_return = fields.Text('Reason for Return')
-    source_location_id = fields.Many2one('stock.location', string='Source Location', required=True)
-    destination_location_id = fields.Many2one('stock.location', string='Destination Location', required=True)
+    source_location_id = fields.Many2one('stock.location', string='Source Location', required=True,
+                            default=lambda self: self.env['stock.location'].search(SOURCE_LOCATION_DOMAINS[RETURN_TYPES[self._context.get('active_model')]])[0])
+    destination_location_id = fields.Many2one('stock.location', string='Destination Location', required=True,
+                            default=lambda self: self.env['stock.location'].search(DESTINATION_LOCATION_DOMAINS[RETURN_TYPES[self._context.get('active_model')]])[0])
 
     @api.multi
     def get_data(self):
@@ -107,7 +109,6 @@ class RMAWizardLine(models.TransientModel):
         order_id = self.rma_wizard_id.order_id
         line_id = self.env[LINE_MODELS[model]].search([('order_id','=',order_id),('product_id','=',self.product_id.id)])
         self.quantity = line_id.product_uom_qty
-
 
     # Method to limit products to only products on the order
     @api.onchange('product_id')

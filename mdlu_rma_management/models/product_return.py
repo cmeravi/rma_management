@@ -55,6 +55,16 @@ class ProductReturn(models.Model):
         for rma in self:
             rma.delivery_count = len(rma.picking_ids.filtered(lambda pick: pick.state != 'cancel'))
 
+    @api.multi
+    def _compute_sale_orders(self):
+        for rma in self:
+            rma.sale_count = len(rma.sale_ids)
+
+    @api.multi
+    def _compute_purchase_orders(self):
+        for rma in self:
+            rma.purchase_count = len(rma.purchase_ids)
+
     def _edit_return_type(self):
         for rec in self:
             if rec.product_return_type in ['incoming', 'outgoing']:
@@ -100,8 +110,7 @@ class ProductReturn(models.Model):
     name = fields.Char(string='Return Reference', required=True, copy=False, readonly=True, index=True, default='New')
     state = fields.Selection([
         ('draft', 'Draft'),
-        ('waiting_product', 'Waiting for Product'),
-        ('waiting_refund', 'Waiting on Credit'),
+        ('processing', 'Processing'),
         ('followup', 'Followup'),
         ('done', 'Done'),
         ('cancelled', 'Cancelled')],
@@ -109,7 +118,6 @@ class ProductReturn(models.Model):
     partner_id = fields.Many2one('res.partner', string='Partner', required=True,readonly=True, states={'draft': [('readonly', False)]})
     reference = fields.Char('RMA Number', readonly=True, states={'draft': [('readonly', False)]})
     order_date = fields.Datetime('Order Date', required=True, readonly=True, states={'draft': [('readonly', False)]}, default=fields.Datetime.now)
-    is_create_refund = fields.Boolean('Create Credit Note', default=True, readonly=True, states={'draft': [('readonly', False)]})
     reason_return = fields.Text('Reason for Return', readonly=True, states={'draft': [('readonly', False)]})
     purchase_id = fields.Many2one('purchase.order', string='Source Purchase Order')
     sale_order_id = fields.Many2one('sale.order', string='Source Sale Order')
@@ -126,7 +134,25 @@ class ProductReturn(models.Model):
     invoice_ids = fields.One2many("account.invoice", 'rma_id', string='Invoices', readonly=True, copy=False)
     picking_ids = fields.One2many('stock.picking', 'rma_id', string='Picking associated to this RMA')
     delivery_count = fields.Integer(string='Delivery Orders', compute='_compute_picking_ids')
+    sale_ids = fields.One2many('sale.order', 'source_rma_id', string='Replacement Sale Orders', readonly=True, copy=False)
+    sale_count = fields.Integer(string='# of Sale Orders', compute='_compute_sale_orders', readonly=True)
+    purchase_ids = fields.One2many('purchase.order', 'source_rma_id', string='Replacement Purchase Orders', readonly=True, copy=False)
+    purchase_count = fields.Integer(string='# of Purchase Orders', compute='_compute_purchase_orders', readonly=True)
 
+
+    @api.onchange('product_return_type','sale_order_id','purchase_id')
+    def order_info(self):
+        return_type = self.product_return_type
+        destination_domain = DESTINATION_LOCATION_DOMAINS[return_type] if return_type else []
+        self.destination_location_id = self.env['stock.location'].search(destination_domain)[0]
+
+        source_domain = SOURCE_LOCATION_DOMAINS[return_type] if return_type else []
+        self.source_location_id = self.env['stock.location'].search(source_domain)[0]
+
+        if self.product_return_type == 'incoming' and self.sale_order_id:
+            self.partner_id = self.sale_order_id.partner_id
+        elif self.product_return_type == 'outgoing' and self.purchase_id:
+            self.partner_id = self.purchase_id.partner_id
 
     @api.multi
     @api.returns('self', lambda value: value.id)
@@ -195,6 +221,7 @@ class ProductReturn(models.Model):
     @api.constrains('product_return_type', 'company_id')
     def get_rma_name(self):
         #get prefix based on return type
+        company_abbreviation = self.company_id.rma_seq_abbr if self.company_id.rma_seq_abbr else ''
         prefix = 'RMA-'
         if self.product_return_type == 'incoming':
             prefix = 'CRMA-'
@@ -203,7 +230,7 @@ class ProductReturn(models.Model):
 
         #get sequence based on ID and zerofill
         seq = str(self.id).zfill(4)
-        self.name = _('%s%s%s') % (prefix, self.company_id.rma_seq_abbr, seq)
+        self.name = _('%s%s%s') % (prefix, company_abbreviation, seq)
 
     #get list of and count for the invoices (Credits/refunds) associated with the picking
     def _get_invoiced(self):
@@ -223,6 +250,34 @@ class ProductReturn(models.Model):
             elif self.product_return_type == 'incoming':
                 action['views'] = [(self.env.ref('account.invoice_form').id, 'form')]
             action['res_id'] = invoices.ids[0]
+        else:
+            action = {'type': 'ir.actions.act_window_close'}
+        return action
+
+    #define button for viewing the Replacement Sale Orders
+    @api.multi
+    def action_view_sales(self):
+        sales = self.mapped('sale_ids')
+        action = self.env.ref('sale.action_orders').read()[0]
+        if len(sales) > 1:
+            action['domain'] = [('id', 'in', sales.ids)]
+        elif len(sales) == 1:
+            action['views'] = [(self.env.ref('sale.view_order_form').id, 'form')]
+            action['res_id'] = sales.ids[0]
+        else:
+            action = {'type': 'ir.actions.act_window_close'}
+        return action
+
+    #define button for viewing the Replacement Purchase Orders
+    @api.multi
+    def action_view_purchases(self):
+        pos = self.mapped('purchase_ids')
+        action = self.env.ref('purchase.purchase_form_action').read()[0]
+        if len(pos) > 1:
+            action['domain'] = [('id', 'in', pos.ids)]
+        elif len(pos) == 1:
+            action['views'] = [(self.env.ref('purchase.purchase_order_form').id, 'form')]
+            action['res_id'] = pos.ids[0]
         else:
             action = {'type': 'ir.actions.act_window_close'}
         return action
@@ -351,7 +406,7 @@ class ProductReturn(models.Model):
         return inv_dict
 
     @api.multi
-    def _create_credit_note(self):
+    def _create_credit_note(self, credit_items):
         result = []
         AccountInvoiceLine = self.env['account.invoice.line']
         for rma in self:
@@ -366,7 +421,7 @@ class ProductReturn(models.Model):
             #create credit_note
             credit_note = self.env['account.invoice'].create(inv_dict)
             inv_line_list = self.env['account.invoice.line']
-            for line in rma.return_line_ids:
+            for line in credit_items:
 
                 #set credit note line description
                 description = ''
@@ -393,7 +448,7 @@ class ProductReturn(models.Model):
                     'uom_id': line.uom_id and line.uom_id.id or False,
                     'invoice_id': credit_note.id,
                     'account_analytic_id': line.account_analytic_id and line.account_analytic_id.id or False,
-                    'price_unit': line.price_unit if rma.product_return_type == 'incoming' else line.last_price_unit,
+                    'price_unit': line.price_unit,
                 }
 
                 new_inv_line = self.env['account.invoice.line'].create(inv_line_vals)
@@ -411,9 +466,46 @@ class ProductReturn(models.Model):
 
         return True
 
+    def _repalcement_order(self, replace_items):
+        for rma in self:
+            # Shared values
+            order_vals = {
+                'partner_id': rma.partner_id.id,
+                'company_id': rma.company_id.id,
+                'state': 'draft',
+                'source_rma_id': rma.id,
+            }
+
+            # Sale Order Processing
+            if rma.product_return_type == 'incoming':
+                if rma.sale_order_id:
+                    order = rma.sale_order_id
+                    order_vals.update({
+                        'currency_id': order.currency_id.id,
+                        'user_id': order.user_id.id,
+                    })
+
+                sale_order = self.env['sale.order'].create(order_vals)
+                for line in replace_items:
+                    line_vals = line.get_sale_line_vals(sale_order)
+                    self.env['sale.order.line'].create(line_vals)
+
+            # Purchase Order Processing
+            if rma.product_return_type == 'outgoing':
+                if rma.purchase_id:
+                    order = rma.purchase_id
+                    order_vals.update({
+                        'currency_id': order.currency_id.id,
+                        'origin': order.name,
+                    })
+                purchase_order = self.env['purchase.order'].create(order_vals)
+                for line in replace_items:
+                    line_vals = line.get_po_line_vals(purchase_order)
+                    self.env['purchase.order.line'].create(line_vals)
+
 
     @api.multi
-    def create_delivery_order(self):
+    def confirm_rma(self):
 
         for rma in self:
             if not rma.return_line_ids.ids:
@@ -434,16 +526,18 @@ class ProductReturn(models.Model):
                 picking.action_confirm()
                 picking.action_assign()
 
+            credit_items = rma.return_line_ids.filtered(lambda line: line.return_process == 'credit')
+            replace_items = rma.return_line_ids.filtered(lambda line: line.return_process == 'replacement')
             #check condition for creating refund
-            if rma.is_create_refund:
+            if credit_items:
                 #create vendor refund bill
-                rma._create_credit_note()
+                rma._create_credit_note(credit_items)
 
-            #set state equal to done
-            if rma.product_return_type == 'incoming':
-                rma.write({'state': 'waiting_product'})
-            if rma.product_return_type == 'outgoing':
-                rma.write({'state': 'waiting_refund'})
+            if replace_items:
+                rma._repalcement_order(replace_items)
+
+            #Move RMA to processing
+            rma.write({'state': 'processing'})
 
         return True
 
@@ -461,7 +555,7 @@ class ProductReturn(models.Model):
         followup_date = (datetime.today() - timedelta(days=settings['rma_followup_timeframe'])).replace(hour=23, minute=59, second=59, microsecond=9999)
         rma_follwup_ids = self.env['product.return'].search([
             ('product_return_type', '=', 'incoming'),
-            ('state', 'in', ('draft','waiting_product','followup')),
+            ('state', 'in', ('draft','processing','followup')),
             ('create_date', '<=', followup_date)])
         for rma in rma_follwup_ids:
             rma.action_followup()
@@ -474,14 +568,11 @@ class ProductReturnLine(models.Model):
     _name = "product.return.line"
     _description = "Product Return Line"
 
-    @api.depends('quantity','price_unit','last_price_unit')
+    @api.depends('quantity','price_unit')
     def _compute_amount(self):
         """ Compute the amounts of the Return line. """
         for line in self:
-            price = line.price_unit if line.return_id.product_return_type == 'incoming' else line.last_price_unit
-            line.update({'price_total': price * line.quantity,})
-
-
+            line.update({'price_total': line.price_unit * line.quantity,})
 
     return_id = fields.Many2one('product.return', string='Return Product ID')
     product_id = fields.Many2one('product.product', string='Product', required=True)
@@ -490,7 +581,6 @@ class ProductReturnLine(models.Model):
     quantity = fields.Float('Quantity', default=1.0)
     uom_id = fields.Many2one('uom.uom', string='Unit of Measure', related='product_id.uom_id')
     price_unit = fields.Float('Std Cost', digits=dp.get_precision('Product Price'))
-    last_price_unit = fields.Float('Unit Price', digits=dp.get_precision('Product Price'))
     account_analytic_id = fields.Many2one('account.analytic.account', string='Analytic Account')
     company_id = fields.Many2one('res.company', related='return_id.company_id', string='Company', store=True, readonly=True)
     qty_done = fields.Float('Done Qty')
@@ -502,13 +592,32 @@ class ProductReturnLine(models.Model):
         'return_line_id',
         'invoice_line_id',
         string='Invoice Lines', copy=False)
+    return_process = fields.Selection([('credit', 'Credit Note'),('replacement','Replacement'),('manual','Manual Processing')], default='manual')
 
-    @api.constrains('product_id','quantity')
+    # Method to limit products to only products on the order
+    @api.onchange('product_id')
+    def get_product_domain(self):
+        product_ids = []
+        if self.return_id.product_return_type == 'incoming':
+            product_ids =  self.env['product.product'].search([('sale_ok','=',True)]).mapped('id')
+            if self.return_id.sale_order_id:
+                product_ids = self.env['sale.order.line'].search([('order_id','=',self.return_id.sale_order_id.id)]).mapped('product_id').mapped('id')
+        elif self.return_id.product_return_type == 'outgoing':
+            product_ids =  self.env['product.product'].search([('purchase_ok','=',True)]).mapped('id')
+            if self.return_id.purchase_id:
+                product_ids = self.env['purchase.order.line'].search([('order_id','=',self.return_id.purchase_id.id)]).mapped('product_id').mapped('id')
+        return {'domain':{'product_id': [('id','in',product_ids)],},}
+
+    @api.onchange('product_id','quantity')
     def _check_price_unit(self):
         for line in self:
             line.price_unit = line.product_id.standard_price
             if line.return_id.product_return_type == 'incoming':
-                line.price_unit = line.return_id.partner_id.property_product_pricelist.get_product_price(line.product_id,1,line.return_id.partner_id)
+                sale_line = self.env['sale.order.line'].search([('order_id','=',self.return_id.sale_order_id.id),('product_id','=',self.product_id.id)])
+                line.price_unit = sale_line.price_unit
+            elif line.return_id.product_return_type == 'outgoing':
+                po_line = self.env['purchase.order.line'].search([('order_id','=',self.return_id.purchase_id.id),('product_id','=',self.product_id.id)])
+                line.price_unit = po_line.price_unit
 
     @api.onchange('product_id')
     def _onchange_option(self):
@@ -540,18 +649,41 @@ class ProductReturnLine(models.Model):
             vendor_stock_moves_ids = moves.search([('partner_id', '=', self.return_id.partner_id.id), ('state', '=', 'done'), ('product_id', '=', self.product_id.id)])
 
             if vendor_stock_moves_ids:
-                self.last_price_unit = moves.browse(max(vendor_stock_moves_ids.ids)).price_unit
+                self.price_unit = moves.browse(max(vendor_stock_moves_ids.ids)).price_unit
             else:
                 #check last product price in other vendors
                 vendor_stock_moves_ids = moves.search([('state', '=', 'done'), ('product_id', '=', self.product_id.id)])
                 if vendor_stock_moves_ids:
-                    self.last_price_unit = moves.browse(max(vendor_stock_moves_ids.ids)).price_unit
+                    self.price_unit = moves.browse(max(vendor_stock_moves_ids.ids)).price_unit
 
             #check Unit Price is equal to zero then update with product cost price
-            if self.last_price_unit == 0.0:
+            if self.price_unit == 0.0:
 
-                self.last_price_unit = self.product_id.standard_price
+                self.price_unit = self.product_id.standard_price
 
+    def get_po_line_vals(self, po):
+        return {
+            'name': '[%s] %s' % (self.product_id.default_code, self.product_id.name) if self.product_id.default_code else self.product_id.name,
+            'order_id': po.id,
+            'product_id': self.product_id.id,
+            'product_qty': self.quantity,
+            'price_unit': self.product_id.price,
+            'product_uom': self.product_id.uom_id.id,
+            'date_planned': po.date_order,
+            'rma_ids': (4,self.id),
+        }
+
+    def get_sale_line_vals(self, sale):
+        return {
+            'name': '[%s] %s' % (self.product_id.default_code, self.product_id.name) if self.product_id.default_code else self.product_id.name,
+            'order_id': sale.id,
+            'product_id': self.product_id.id,
+            'product_uom_qty': self.quantity,
+            'price_unit': self.product_id.price,
+            'product_uom': self.product_id.uom_id.id,
+            'discount': 100.0,
+            'rma_ids': (4,self.id),
+        }
     @api.multi
     def _create_stock_moves(self, picking, rma):
 
@@ -560,7 +692,6 @@ class ProductReturnLine(models.Model):
         done = self.env['stock.move'].browse()
 
         for line in self:
-            price = line.price_unit if line.return_id.product_return_type == 'incoming' else line.last_price_unit
             #prepare stock move values
             template = {
                 'name': line.product_id.name or '',
@@ -574,7 +705,7 @@ class ProductReturnLine(models.Model):
                 'partner_id': line.return_id.partner_id.id,
                 'state': 'draft',
                 'company_id': line.return_id.company_id.id,
-                'price_unit': price,
+                'price_unit': line.price_unit,
                 'picking_type_id': line.return_id._get_picking_type_id(),
                 'group_id': False,
                 'origin': rma.name,

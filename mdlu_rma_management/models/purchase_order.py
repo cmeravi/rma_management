@@ -15,6 +15,7 @@ class PurchaseOrder(models.Model):
 
     rma_ids = fields.One2many('product.return', 'purchase_id', string='RMA')
     rma_count = fields.Integer(string='RMAs', compute='_compute_rma_ids')
+    source_rma_id = fields.Many2one('product.return', string='Source RMA')
 
     @api.multi
     def action_view_rmas(self):

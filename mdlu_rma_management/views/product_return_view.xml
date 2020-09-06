@@ -7,9 +7,9 @@
         <field name="arch" type="xml">
             <form string='Product Return'>
                 <header>
-                    <button name="create_delivery_order" string="Confirm" type="object" class="btn-primary" attrs="{'invisible': [('delivery_count', '!=', 0)]}"/>
-                    <button name="action_cancel" string="Cancel" type="object" class="btn-default" states="draft,waiting_product,waiting_refund,followup"/>
-                    <button name="action_reset" string="Reset" type="object" class="btn-default" states="waiting_product,waiting_refund,followup"/>
+                    <button name="confirm_rma" string="Confirm" type="object" class="btn-primary" attrs="{'invisible': [('delivery_count', '!=', 0)]}"/>
+                    <button name="action_cancel" string="Cancel" type="object" class="btn-default" states="draft,processing,followup"/>
+                    <button name="action_reset" string="Reset" type="object" class="btn-default" states="processing,followup"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,done"/>
                 </header>
                 <sheet>
@@ -31,6 +31,20 @@
                         icon="fa-pencil-square-o"
                         attrs="{'invisible': [('invoice_count', '=', 0)]}">
                         <field name="invoice_count" widget="statinfo" string="Credit Notes"/>
+                    </button>
+                    <button class="oe_stat_button"
+                        type="object"
+                        name="action_view_sales"
+                        attrs="{'invisible': [('sale_count', '=', 0)]}"
+                        icon="fa-usd">
+                        <field string="Sales" name="sale_count" widget="statinfo"/>
+                    </button>
+                    <button class="oe_stat_button"
+                        name="action_view_purchases"
+                        type="object"
+                        attrs="{'invisible': [('purchase_count', '=', 0)]}"
+                        icon="fa-shopping-cart">
+                        <field string="Purchases" name="purchase_count" widget="statinfo"/>
                     </button>
                   </div>
 
@@ -55,7 +69,6 @@
                         <field name="order_date"/>
                         <field name="purchase_id" attrs="{'invisible': [('product_return_type','!=','outgoing')]}"/>
                         <field name="sale_order_id" attrs="{'invisible': [('product_return_type','!=','incoming')]}"/>
-                        <field name="is_create_refund"/>
                         <field name="company_id" options="{'no_create': True}" groups="base.group_multi_company"/>
                         <field name="reason_return" attrs="{'required': [('product_return_type', '=', 'incoming')]}"/>
                     </group>
@@ -67,11 +80,11 @@
                                 <field name="product_id"/>
                                 <field name="op_type" invisible="1"/>
                                 <field name="company_id" invisible="1"/>
+                                <field name="return_process"/>
                                 <field name="account_analytic_id"/>
                                 <field name="qty_available"/>
                                 <field name="quantity"/>
                                 <field name="uom_id"/>
-                                <field name="last_price_unit"/>
                                 <field name="price_unit"/>
                                 <field name="return_id" invisible="1"/>
                                 <field name="qty_done" attrs="{'invisible': [('op_type', '=', 'none')]}"/>
@@ -112,7 +125,6 @@
                 <field name="company_id"/>
                 <field name="reason_return"/>
                 <field name="state"/>
-                <field name="is_create_refund"/>
             </tree>
         </field>
     </record>

@@ -43,8 +43,7 @@
                     <tr>
                         <th><strong>Product</strong></th>
                         <th class="text-right"><strong>Qty</strong></th>
-                        <th class="text-right" t-if="o.product_return_type == 'outgoing'"><strong>Std Cost</strong></th>
-                        <th class="text-right"><strong>Unit Price</strong></th>
+                        <th class="text-right"><strong>Std Cost</strong></th>
                         <th class="text-right"><strong>Net Price</strong></th>
                     </tr>
                 </thead>
@@ -59,9 +58,6 @@
                         </td>
                         <td class="text-right" t-if="o.product_return_type == 'outgoing'">
                             <span t-field="line.price_unit"/>
-                        </td>
-                        <td class="text-right">
-                            <span t-field="line.last_price_unit"/>
                         </td>
                         <td class="text-right">
                             <span t-field="line.price_total"/>
